@@ -1,5 +1,5 @@
 import polars as pl
-from my_polars_functions import hamming_distance
+from my_polars_functions import hamming_distance, modify_py_dataframe
 
 a = pl.Series("a", ["foo", "bar"])
 b = pl.Series("b", ["fooy", "ham"])
@@ -17,3 +17,11 @@ print(
         pl.map(["a", "b"], lambda series: hamming_distance(series[0], series[1]))
     )
 )
+
+df = pl.DataFrame({"a": [1, 2, 3], "b": ["a", "b", "c"]})
+
+# print(df)
+
+print(modify_py_dataframe(df))
+
+# print(df.to_dict())

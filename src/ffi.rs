@@ -1,10 +1,11 @@
-use polars::export::arrow;
 use arrow::ffi;
+use polars::export::arrow;
 use polars::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyo3::ffi::Py_uintptr_t;
 use pyo3::prelude::*;
 use pyo3::{PyAny, PyObject, PyResult};
+use std::collections::BTreeMap;
 
 /// Take an arrow array from python and convert it to a rust arrow array.
 /// This operation does not copy data.
@@ -62,7 +63,24 @@ pub fn py_series_to_rust_series(series: &PyAny) -> PyResult<Series> {
     // retrieve rust arrow array
     let array = array_to_rust(array)?;
 
-    Series::try_from((name.as_str(), array)).map_err(|e| PyValueError::new_err(format!("{}", e)))
+    Series::try_from((name.as_str(), array))
+        .map_err(|e| PyValueError::new_err(format!("{}", e)))
+}
+
+pub fn py_dataframe_to_rust_dataframe(dataframe: &PyAny) -> PyResult<DataFrame> {
+    Python::with_gil(|py| {
+        let builtins = PyModule::import(py, "builtins")?;
+        let func = builtins.getattr("list")?;
+        let v_in = func.call1((dataframe,))?.extract::<Vec<&PyAny>>()?;
+        let mut v_out = vec![];
+
+        for series in v_in {
+            let series = py_series_to_rust_series(series)?;
+            v_out.push(series);
+        }
+
+        DataFrame::new(v_out).map_err(|e| PyValueError::new_err(format!("{}", e)))
+    })
 }
 
 pub fn rust_series_to_py_series(series: &Series) -> PyResult<PyObject> {
@@ -80,6 +98,22 @@ pub fn rust_series_to_py_series(series: &Series) -> PyResult<PyObject> {
         // import polars
         let polars = py.import("polars")?;
         let out = polars.call_method1("from_arrow", (pyarrow_array,))?;
+        Ok(out.to_object(py))
+    })
+}
+
+pub fn rust_dataframe_to_py_dataframe(dataframe: &DataFrame) -> PyResult<PyObject> {
+    let names = dataframe.get_column_names_owned();
+    let mut d =  BTreeMap::new();
+    for n in names {
+        let rs_series= dataframe.column(&n).unwrap();
+        let py_series = rust_series_to_py_series(rs_series).unwrap();
+        d.insert(n.to_string(), py_series);
+    }
+
+    Python::with_gil(|py| {
+        let polars = py.import("polars")?;
+        let out = polars.call_method1("DataFrame", (d,))?;
         Ok(out.to_object(py))
     })
 }

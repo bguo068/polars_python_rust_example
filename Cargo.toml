@@ -1,5 +1,5 @@
 [package]
-name = "python_rust_compiled_function"
+name = "polars_python_rust_example"
 version = "0.1.0"
 edition = "2021"
 

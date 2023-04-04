@@ -5,6 +5,18 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 #[pyfunction]
+fn modify_py_dataframe(dataframe: &PyAny) -> PyResult<PyObject> {
+    let mut df = ffi::py_dataframe_to_rust_dataframe(dataframe)?;
+    let mut v = vec![];
+    for _ in 0..(df.height()) {
+        v.push(0);
+    }
+    df.replace_or_add("my_col", Series::new("my_col", v))
+        .map_err(|e| PyValueError::new_err(format!("{}", e)))?;
+    ffi::rust_dataframe_to_py_dataframe(&df)
+}
+
+#[pyfunction]
 fn hamming_distance(series_a: &PyAny, series_b: &PyAny) -> PyResult<PyObject> {
     let series_a = ffi::py_series_to_rust_series(series_a)?;
     let series_b = ffi::py_series_to_rust_series(series_b)?;
@@ -46,5 +58,7 @@ fn hamming_distance_strs(a: Option<&str>, b: Option<&str>) -> Option<u32> {
 #[pymodule]
 fn my_polars_functions(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_wrapped(wrap_pyfunction!(hamming_distance)).unwrap();
+    m.add_wrapped(wrap_pyfunction!(modify_py_dataframe))
+        .unwrap();
     Ok(())
 }
